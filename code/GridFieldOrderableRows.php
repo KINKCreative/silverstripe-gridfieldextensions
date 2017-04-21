@@ -521,7 +521,7 @@ class GridFieldOrderableRows extends RequestHandler implements
 		$table  = $this->getSortTable($list);
 		$clause = sprintf('"%s"."%s" = 0', $table, $this->getSortField());
 
-        $obj = new $sortTable();
+        $obj = new $table();
         $parentClass = get_parent_class($obj);
 
         $singleLastEditedWrite = ($parentClass == "DataObject");
