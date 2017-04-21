@@ -467,8 +467,17 @@ class GridFieldOrderableRows extends RequestHandler implements
 		// match to order the objects.
 		if (!$isVersioned) {
 			$sortTable = $this->getSortTable($list);
-			$additionalSQL = (!$list instanceof ManyManyList) ? ', "LastEdited" = NOW()' : '';
-			foreach($sortedIDs as $sortValue => $id) {
+
+            // Check if extends DataObject or a child class thereof
+            $obj = new $sortTable();
+            $parentClass = get_parent_class($obj);
+
+            $singleLastEditedWrite = ($parentClass == "DataObject");
+
+            // NOTE: If ManyManyList - seems like there's no update of a LastEdited anywhere
+			$additionalSQL = ($singleLastEditedWrite && !$list instanceof ManyManyList) ? ', "LastEdited" = NOW()' : '';
+
+            foreach($sortedIDs as $sortValue => $id) {
 				if($map[$id] != $sortValue) {
 					DB::query(sprintf(
 						'UPDATE "%s" SET "%s" = %d%s WHERE %s',
@@ -478,6 +487,15 @@ class GridFieldOrderableRows extends RequestHandler implements
 						$additionalSQL,
 						$this->getSortTableClauseForIds($list, $id)
 					));
+
+                    if(!$singleLastEditedWrite) {
+                        DB::query(sprintf(
+                            'UPDATE "%s" SET %s WHERE %s',
+    						$parentClass,
+    						'"LastEdited" = NOW()',
+    						$this->getSortTableClauseForIds($list, $id)
+                        ));
+                    }
 				}
 			}
 		} else {
@@ -502,7 +520,13 @@ class GridFieldOrderableRows extends RequestHandler implements
 		$field  = $this->getSortField();
 		$table  = $this->getSortTable($list);
 		$clause = sprintf('"%s"."%s" = 0', $table, $this->getSortField());
-		$additionalSQL = (!$list instanceof ManyManyList) ? ', "LastEdited" = NOW()' : '';
+
+        $obj = new $sortTable();
+        $parentClass = get_parent_class($obj);
+
+        $singleLastEditedWrite = ($parentClass == "DataObject");
+
+        $additionalSQL = ($singleLastEditedWrite && !$list instanceof ManyManyList) ? ', "LastEdited" = NOW()' : '';
 
 		foreach($list->where($clause)->column('ID') as $id) {
 			$max = DB::query(sprintf('SELECT MAX("%s") + 1 FROM "%s"', $field, $table));
@@ -516,6 +540,15 @@ class GridFieldOrderableRows extends RequestHandler implements
 				$additionalSQL,
 				$this->getSortTableClauseForIds($list, $id)
 			));
+
+            if(!$singleLastEditedWrite) {
+                DB::query(sprintf(
+                    'UPDATE "%s" SET %s WHERE %s',
+                    $parentClass,
+                    '"LastEdited" = NOW()',
+                    $this->getSortTableClauseForIds($list, $id)
+                ));
+            }
 		}
 	}
 
